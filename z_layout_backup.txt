@@ -1,0 +1,70 @@
+<script>
+	import { defaultConfig } from 'svelte-wagmi';
+	import { onMount } from 'svelte';
+	import '../app.css';
+	import Navbar from '$src/components/Navbar.svelte';
+
+	// import { base } from '@wagmi/core/chains';
+
+	import { readContract } from '@wagmi/core';
+	import MoonChef from '$src/lib/abis/MoonChef';
+
+	import { connection, connected, chainId, wagmiLoaded, signerAddress } from 'svelte-wagmi';
+
+	const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
+	const walletConnectId = import.meta.env.VITE_PUBLIC_WALLETCONNECT_ID;
+
+	onMount(async () => {
+		const erckit = defaultConfig({
+			appName: 'Fromage-front',
+			chains: [base],
+			walletConnectProjectId: walletConnectId,
+			alchemyId: alchemyApiKey
+		});
+		await erckit.init();
+	});
+
+	import { createPublicClient, http } from 'viem';
+	import { base } from 'viem/chains';
+
+	const client = createPublicClient({
+		chain: base,
+		transport: http()
+	});
+
+	let currentBlockNumber = '';
+	async function getBlockNumber() {
+		let result;
+		try {
+			result = await client.getBlockNumber();
+			console.log(result);
+			return result;
+		} catch (error) {
+			console.error('Error getting block number:', error);
+			return 'Error getting block number:';
+		}
+	}
+	async function updateBlockNumber() {
+		currentBlockNumber = await getBlockNumber();
+	}
+
+	updateBlockNumber();
+
+	const data = async () => {
+		try {
+			const data = await readContract({
+				address: '0x1026654dc8154Fd31b3a4189423C0c8db5A7C167',
+				abi: MoonChef,
+				functionName: 'cheese'
+			});
+			console.log(data);
+			return data; // Optional, in case you want to use this data elsewhere.
+		} catch (error) {
+			console.error('Error reading contract:', error);
+		}
+	};
+</script>
+
+<Navbar />
+<h1>Current Block Number: {currentBlockNumber}</h1>
+<slot />
