@@ -2,60 +2,80 @@
 	import { onMount } from "svelte";
 	import "../app.css";
 	import Navbar from "$src/components/Navbar.svelte";
+	import { blockchainStore } from '$lib/stores/wagmiStore';
+	import connector from '$lib/walletConnection';
+	import {connect, fetchBalance, getContract, readContract } from "@wagmi/core"
 
-	import { walletClientState, initializeWalletClient } from "$lib/stores/viemWalletClientStore";
-	import { publicClientState, initializePublicClient } from "$lib/stores/viemPublicClientStore";
+	import UniswapV2Router from "$src/lib/abis/UniswapV2Router";
+	
+	let balance, contract;
 
-	import MoonChef from "$src/lib/abis/MoonChef";
-	let address;
-	let blockNumber;
+	onMount(() => {
+    if (typeof window.ethereum !== 'undefined') {
+        connect({ connector }).then(data => {
+            if (data.account) {
+                blockchainStore.update(store => {
+                    store.wallet = {
+                        isConnected: true,
+                        address: data.account
+                    };
+                    return store;
+                });
+                updateBalance();
+            }
+        }).catch(error => {
+            console.error('Error connecting wallet:', error);
+        });
+    } else {
+        console.log('MetaMask (or other injected wallet) is not available.');
+    }
+});
 
-	// const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
-	// const walletConnectId = import.meta.env.VITE_PUBLIC_WALLETCONNECT_ID;
+$: if ($blockchainStore.wallet.address && $blockchainStore.wallet.isConnected) {
+    updateBalance();
+}
 
-	onMount(async () => {
-		initializePublicClient();
-		initializeWalletClient();
-	});
+async function updateBalance() {
+    try {
+        const address = $blockchainStore.wallet.address;
+        if (!address) {
+            console.error('Wallet address is undefined or empty.');
+            return;
+        }
 
-	$: if ($walletClientState.isInitialized == true) {
-		const walletClient = $walletClientState.client;
-		loadAddress(walletClient);
+        const response = await fetchBalance({ address });
+        if (response) {
+            balance = `${response.formatted} ${response.symbol}`;
+        } else {
+			console.error('No balance data received:', response);
+			console.log(response.decimals)
+            balance = '0 ETH'; // Set a default or error state for balance
+        }
+    } catch (error) {
+        console.error('Error fetching balance:', error);
+        balance = 'Error fetching balance'; // Set a default or error state for balance
+    }
+}
+
+async function readContract_() {
+	try {
+		 contract = await readContract({
+			address: "0xE4533F29FA269aA6e87Ffc2088dA55F4F17ceCC8",
+			abi: UniswapV2Router,
+			functionName: "WETH",
+		});
+		return contract;
+	} catch (error) {
+		console.error("Error getting contract function:", error);
 	}
-
-	$: if ($publicClientState.isInitialized == true) {
-		const publicClient = $publicClientState.client;
-		getBlockNumber(publicClient);
-	}
-
-	async function loadAddress(_walletClient) {
-		if ($walletClientState.isInitialized) {
-			try {
-				address = await _walletClient.requestAddresses();
-			} catch (error) {
-				console.error("Error loading addresses:", error);
-			}
-		} else {
-			console.error("Wallet client is not initialized");
-		}
-	}
-
-	async function getBlockNumber(publicClient_) {
-		if ($publicClientState.isInitialized) {
-			try {
-				blockNumber = await publicClient_.getBlockNumber();
-			} catch (error) {
-				console.error("Error getting block number:", error);
-			}
-		} else {
-			console.error("Public client is not initialized");
-		}
-	}
+}
+readContract_()
+console.log($blockchainStore.wagmiConfig.chains)
 </script>
 
 <Navbar />
 
-<p>{address}</p>
-<p>{blockNumber}</p>
-
+<h1>User Balance</h1>
+<p>{balance}</p>
+<p>{$blockchainStore.wagmiConfig.chains}</p>
 <slot />
