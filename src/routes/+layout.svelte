@@ -3,34 +3,59 @@
 	import "../app.css";
 	import Navbar from "$src/components/Navbar.svelte";
 
-	import { walletClientStore } from "$lib/stores/viemWalletClientStore";
-	import { publicClientStore } from "$lib/stores/viemPublicClientStore";
+	import { walletClientState, initializeWalletClient } from "$lib/stores/viemWalletClientStore";
+	import { publicClientState, initializePublicClient } from "$lib/stores/viemPublicClientStore";
 
 	import MoonChef from "$src/lib/abis/MoonChef";
-	// Viem
+	let address;
+	let blockNumber;
 
-	// let isWalletClientReady = false;
-
-	const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
-	const walletConnectId = import.meta.env.VITE_PUBLIC_WALLETCONNECT_ID;
+	// const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
+	// const walletConnectId = import.meta.env.VITE_PUBLIC_WALLETCONNECT_ID;
 
 	onMount(async () => {
-		walletClientStore.initializeWalletClient();
-		publicClientStore.initializePublicClient();
-		await walletClientStore.loadAddress();
-
-		publicClientStore.getBalance($walletClientStore.address);
+		initializePublicClient();
+		initializeWalletClient();
 	});
+
+	$: if ($walletClientState.isInitialized == true) {
+		const walletClient = $walletClientState.client;
+		loadAddress(walletClient);
+	}
+
+	$: if ($publicClientState.isInitialized == true) {
+		const publicClient = $publicClientState.client;
+		getBlockNumber(publicClient);
+	}
+
+	async function loadAddress(_walletClient) {
+		if ($walletClientState.isInitialized) {
+			try {
+				address = await _walletClient.requestAddresses();
+			} catch (error) {
+				console.error("Error loading addresses:", error);
+			}
+		} else {
+			console.error("Wallet client is not initialized");
+		}
+	}
+
+	async function getBlockNumber(publicClient_) {
+		if ($publicClientState.isInitialized) {
+			try {
+				blockNumber = await publicClient_.getBlockNumber();
+			} catch (error) {
+				console.error("Error getting block number:", error);
+			}
+		} else {
+			console.error("Public client is not initialized");
+		}
+	}
 </script>
 
 <Navbar />
 
-{#if $walletClientStore.isWalletClientReady}
-	<p>Address is {$walletClientStore.address}</p>
-{/if}
-{#if $publicClientStore.isPublicClientReady}
-	<p>Public Client is ready</p>
-	<p>Balance is {$publicClientStore.balance} ETH</p>
-{/if}
+<p>{address}</p>
+<p>{blockNumber}</p>
 
 <slot />

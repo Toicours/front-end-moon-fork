@@ -2,73 +2,23 @@ import { writable } from "svelte/store";
 // Viem
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
-import { formatEther } from "viem";
 
-function createPublicClientStore() {
-	// Initial state of the store
+// Create a writable store
+const publicClientState = writable({ client: null, isInitialized: false });
 
-	const transport = http("https://base-mainnet.g.alchemy.com/v2/-kOv8-44rAh5hSOh5Nu3cmjg4DxxLZhj");
+// Function to initialize the public client
+function initializePublicClient() {
+	// Configuration options for the public client
 
-	const { subscribe, set, update } = writable({
-		publicClient: null,
-		isPublicClientReady: false,
-		balance: null,
-		error: null
-	});
-
-	let currentState = {
-		publicClient: null,
-		isPublicClientReady: false,
-		balance: null,
-		error: null
+	const config = {
+		chain: base,
+		transport: http("https://base-mainnet.g.alchemy.com/v2/-kOv8-44rAh5hSOh5Nu3cmjg4DxxLZhj")
 	};
 
-	// Update currentState whenever the store changes
-	subscribe((state) => {
-		currentState = state;
-	});
-
-	function initializePublicClient() {
-		const client = createPublicClient({
-			chain: base,
-			transport
-		});
-
-		set({ publicClient: client, isPublicClientReady: true, balance: null, error: null });
-	}
-
-	function resetClient() {
-		set({
-			publicClient: null,
-			isPublicClientReady: false,
-			balance: null,
-			error: null
-		});
-	}
-
-	async function getBalance(address) {
-		if (!currentState.isPublicClientReady) {
-			console.error("Public client is not initialized");
-			return;
-		}
-		try {
-			// get balance, round it to 2 decimal places, and update the store
-			const balance = parseFloat(
-				formatEther(await currentState.publicClient.getBalance({ address }))
-			).toFixed(2);
-			update((state) => ({ ...state, balance }));
-		} catch (error) {
-			console.error("Error getting balance:", error);
-			update((state) => ({ ...state, error }));
-		}
-	}
-
-	return {
-		subscribe,
-		initializePublicClient,
-		getBalance,
-		resetClient
-	};
+	// Create and set the public client
+	const client = createPublicClient(config);
+	publicClientState.set({ client, isInitialized: true });
 }
 
-export const publicClientStore = createPublicClientStore();
+// Export the store and the initialization function
+export { publicClientState, initializePublicClient };
